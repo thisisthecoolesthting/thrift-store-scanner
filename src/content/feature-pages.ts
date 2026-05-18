@@ -95,7 +95,7 @@ const pages: Record<FeatureSlug, SpineSixModel> = {
       "Uses getUserMedia for live preview, barcode decode, and capture in the browser",
       "Works with built-in webcams, USB document cameras, and most plug-and-play overhead cams",
       "Pairs with the same /api/identify pipeline and tag list as Expo — one subscription, mixed surfaces",
-      "Kiosk-style /scan sessions stay readable on a large screen for walk-up questions (full kiosk mode ships separately)",
+      "Kiosk sessions at /scan/kiosk stay readable on a large screen for walk-up questions",
     ],
     steps: [
       "Open /scan on the laptop you already use at the triage table.",

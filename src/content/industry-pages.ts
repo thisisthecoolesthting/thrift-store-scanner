@@ -206,7 +206,7 @@ const pages: Record<IndustrySlug, SpineSixModel> = {
     eyebrow: "INDUSTRY SPOTLIGHT",
     title: "Flea booths improvising sunrise setups",
     subtitle:
-      "Flea market resellers work fast — phone-first. Some run a counter-top kiosk on a tablet for walk-up customer questions about pricing — that's the kiosk mode at /scan?mode=kiosk (coming soon).",
+      "Flea market resellers work fast — phone-first. Some run a counter-top kiosk on a tablet for walk-up customer questions about pricing — use kiosk mode at /scan/kiosk.",
     trustStrip: commonTrust,
     problem: {
       title: "Problem it solves",

@@ -1,20 +1,62 @@
 {
-  "dispatch": "PRICESCOUT-SCAN-POLISH-005",
+  "dispatch_id": "PRICESCOUT-SCAN-POLISH-005",
   "branch": "main",
+  "status": "completed_with_host_blockers",
   "checks": {
-    "npm_run_typecheck": { "exit_code": 0 },
-    "npm_run_test": { "exit_code": 0, "tests_passed": 4 },
+    "prisma_migrate_deploy": {
+      "exit_code": 1,
+      "command": "npx prisma migrate deploy",
+      "note": "Blocked: DATABASE_URL missing in shell; fallback localhost:5432 probe also failed (P1001 cannot reach PostgreSQL)."
+    },
+    "prisma_generate": {
+      "exit_code": 0,
+      "command": "npx prisma generate"
+    },
+    "npm_run_typecheck": {
+      "exit_code": 0,
+      "command": "npm run typecheck"
+    },
+    "npm_run_test": {
+      "exit_code": 0,
+      "command": "npm run test",
+      "tests_passed": 4
+    },
     "npm_run_build": {
       "exit_code": 1,
-      "note": "Compile + static generation succeeded; failed at Collecting build traces (ENOENT _not-found page.js.nft.json on Windows)"
+      "command": "npm run build",
+      "note": "Compiles and type/lint pass, then fails during Next static export/artifact step on Windows with ENOENT under .next."
     }
   },
   "features": [
-    "Camera picker + localStorage persistence in Scanner.tsx",
-    "/scan/kiosk chrome-less route via (kiosk) layout",
-    "POST /api/devices/register + pair-token QR flow",
-    "/admin/devices pair page + kiosk launch link",
-    "/scan/embed stub",
-    "deviceId tagging on identify + lookup"
+    "Camera picker with ps_preferred_camera_id persistence in Scanner",
+    "/scan/kiosk moved to (kiosk) route group with chrome-less full-bleed layout",
+    "/api/devices/register browser pairing with ps_device_id cookie + 402 pool-limit response",
+    "/admin/devices includes kiosk launcher and inline Add device QR modal",
+    "/admin/devices/pair QR token view and /api/devices/pair-token token mint + consume flow",
+    "/api/identify and /api/lookup/[upc] set Scan.deviceId from cookie and update Device.lastSeenAt",
+    "/scan/embed placeholder route present"
+  ],
+  "screenshots": {
+    "captured": false,
+    "note": "Dispatch requested 4 UI screenshots, but local screenshot run is blocked by missing DB/session environment for authenticated admin pages."
+  },
+  "files_touched_for_dispatch": [
+    "src/components/Scanner.tsx",
+    "src/app/(kiosk)/layout.tsx",
+    "src/app/(kiosk)/scan/kiosk/page.tsx",
+    "src/app/admin/devices/page.tsx",
+    "src/app/admin/devices/pair/page.tsx",
+    "src/app/admin/devices/pair-token-card.tsx",
+    "src/app/api/devices/register/route.ts",
+    "src/app/api/devices/pair-token/route.ts",
+    "src/app/api/devices/pair-token/[token]/route.ts",
+    "src/app/api/identify/route.ts",
+    "src/app/api/lookup/[upc]/route.ts",
+    "src/lib/device-register.ts",
+    "src/lib/device-utils.ts",
+    "src/lib/device-constants.ts",
+    "prisma/migrations/20260518150000_scan_polish_kiosk_pairing/migration.sql",
+    "prisma/schema.prisma",
+    "src/app/scan/embed/page.tsx"
   ]
 }

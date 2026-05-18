@@ -1,21 +1,41 @@
 # Reply — PRICESCOUT-SCAN-POLISH-005
 
-**Status:** Shipped on `main` (code + migrations).
+**Status:** completed_with_host_blockers (core dispatch scope shipped in repo state).
 
-## Delivered
+## Completed scope
 
-- Camera enumeration UI in `Scanner.tsx` with `ps_preferred_camera_id` persistence
-- Kiosk mode at `/scan/kiosk` via `(kiosk)` route group (full-bleed, auto-reset, help modal)
-- Browser device pairing: `/api/devices/register`, `ps_device_id` cookie, 4-device limit messaging
-- Admin pair flow: `/admin/devices/pair` + QR token mint
-- Extended `/admin/devices` with kind, last seen, revoke, kiosk launch link
-- `/api/identify` and `/api/lookup/[upc]` attach `Scan.deviceId` and bump `Device.lastSeenAt`
-- `/scan/embed` stub route
+- Camera enumeration + picker in `Scanner.tsx`, with preferred camera persisted via `ps_preferred_camera_id`.
+- Kiosk flow on `/scan/kiosk` via route group: `src/app/(kiosk)/layout.tsx` and `src/app/(kiosk)/scan/kiosk/page.tsx`.
+- Kiosk UX polish: chrome-less shell, full-bleed layout, 64px controls, 30s auto-reset with 5-second countdown overlay, fixed help modal.
+- Browser pairing flow:
+  - `GET/POST /api/devices/register`
+  - stable local fingerprint (`ps_device_fingerprint`)
+  - long-lived `ps_device_id` cookie
+  - 402 pool-limit message ($15/mo per add-on, 4 included baseline)
+- Device pair QR flow:
+  - `/admin/devices/pair`
+  - `POST /api/devices/pair-token`
+  - `GET /api/devices/pair-token/[token]` consume endpoint
+  - `qrcode` rendering in `pair-token-card`.
+- `/admin/devices` extended with kind, name, last seen, 30d scan count, revoke action, kiosk launch CTA, and inline Add device QR modal.
+- `/api/identify` + `/api/lookup/[upc]` now read `ps_device_id`, write `Scan.deviceId`, and update `Device.lastSeenAt`.
+- `/scan/embed` placeholder route exists with partnerships contact.
+- Device limit checks now honor tenant config (`Tenant.deviceLimit`, fallback 4) in both register and pair-token consume paths.
+- Shop-language copy touched in this dispatch uses tag pricing / inventory context (no new flipper language introduced).
 
-## Proof
+## Required command results
 
-`build/proof/PRICESCOUT-SCAN-POLISH-005.json`
+- `npx prisma migrate deploy` **failed** locally: `DATABASE_URL` was not configured in this shell; fallback localhost probe could not reach PostgreSQL (`P1001`).
+- `npx prisma generate` **passed**.
+- `npm run typecheck` **passed**.
+- `npm run test` **passed** (4 tests).
+- `npm run build` **failed on host artifact step** after successful compile/lint/type phases (Windows ENOENT under `.next` during export/trace step).
 
-## Build note
+## Visual proof requirement
 
-`npm run build` compiles and generates pages; on this Windows host it fails at NFT trace collection (`_not-found/page.js.nft.json` ENOENT). VPS Linux deploy cron should still succeed — re-verify on server after push.
+- Dispatch requested 4 screenshots (`/scan` picker, `/scan/kiosk` verdict, `/scan/kiosk` countdown, `/admin/devices` QR modal).
+- Not captured in this run because local authenticated/admin screenshot flow is blocked without DB/session env bootstrap.
+
+## Proof artifact
+
+- `build/proof/PRICESCOUT-SCAN-POLISH-005.json` updated with command outcomes and blocker details.
