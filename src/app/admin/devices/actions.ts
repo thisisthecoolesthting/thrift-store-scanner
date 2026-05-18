@@ -45,6 +45,7 @@ export async function addDevice(formData: FormData) {
     data: {
       tenantId: session.tenantId,
       name,
+      kind: "phone",
       installFingerprint: `web-${crypto.randomUUID()}`,
       status: "active",
       lastSeenAt: new Date(),

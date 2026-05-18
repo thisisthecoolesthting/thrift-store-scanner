@@ -1,0 +1,20 @@
+{
+  "dispatch": "PRICESCOUT-SCAN-POLISH-005",
+  "branch": "main",
+  "checks": {
+    "npm_run_typecheck": { "exit_code": 0 },
+    "npm_run_test": { "exit_code": 0, "tests_passed": 4 },
+    "npm_run_build": {
+      "exit_code": 1,
+      "note": "Compile + static generation succeeded; failed at Collecting build traces (ENOENT _not-found page.js.nft.json on Windows)"
+    }
+  },
+  "features": [
+    "Camera picker + localStorage persistence in Scanner.tsx",
+    "/scan/kiosk chrome-less route via (kiosk) layout",
+    "POST /api/devices/register + pair-token QR flow",
+    "/admin/devices pair page + kiosk launch link",
+    "/scan/embed stub",
+    "deviceId tagging on identify + lookup"
+  ]
+}

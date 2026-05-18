@@ -30,6 +30,7 @@ model Tenant {
   scans              Scan[]
   wpbsGrants         WpbsGrant[]
   invites            Invite[]
+  devicePairTokens   DevicePairToken[]
 }
 
 model WpbsGrant {
@@ -86,12 +87,27 @@ model Device {
   tenantId           String
   tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name               String
+  kind               String    @default("phone")
   installFingerprint String
   lastSeenAt         DateTime?
   status             String
   scans              Scan[]
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+}
+
+model DevicePairToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deviceKind String   @default("phone")
+  deviceName String?
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, expiresAt])
 }
 
 model Scan {
@@ -110,6 +126,12 @@ model Scan {
   netUsd               Float?
   scoreNumeric         Float?
   imageUrl             String?
+  fbListingTitle       String?
+  fbListingDescription String?
+  fbListingCategory    String?
+  fbListingPriceCents  Int?
+  fbListingStatus      String? // "draft" | "copied" | "posted" | "sold"
+  fbListingPostedAt    DateTime?
   scannedAt            DateTime @default(now())
   tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)

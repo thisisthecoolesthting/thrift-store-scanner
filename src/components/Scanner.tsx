@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Loader2, RefreshCcw, ScanBarcode, Search, Type } from "lucide-react";
-import type { VerdictPayload } from "./PriceVerdict";
-import { PriceVerdict } from "./PriceVerdict";
+import { Camera, CircleHelp, Loader2, RefreshCcw, ScanBarcode, Search, Type, X } from "lucide-react";
+import type { VerdictPayload } from "./TagPriceCard";
+import { TagPriceCard } from "./TagPriceCard";
+import {
+  DEVICE_FINGERPRINT_LOCALSTORAGE_KEY,
+  DEVICE_PREFERRED_CAMERA_LOCALSTORAGE_KEY,
+} from "@/lib/device-constants";
 
 type Mode = "camera" | "manual";
 
@@ -18,7 +22,13 @@ type Status =
   | { kind: "result" }
   | { kind: "error"; message: string };
 
-export function Scanner() {
+type ScannerProps = {
+  kiosk?: boolean;
+};
+
+type VerdictResponse = VerdictPayload & { scanId?: string };
+
+export function Scanner({ kiosk = false }: ScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -36,6 +46,13 @@ export function Scanner() {
   const [manualQuery, setManualQuery] = useState<string>("");
   const [verdict, setVerdict] = useState<VerdictPayload | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [deviceRegistered, setDeviceRegistered] = useState<boolean>(false);
+  const [registeringDevice, setRegisteringDevice] = useState<boolean>(false);
+  const [pairBannerError, setPairBannerError] = useState<string | null>(null);
+  const [kioskHelpOpen, setKioskHelpOpen] = useState<boolean>(false);
+  const [kioskCountdown, setKioskCountdown] = useState<number | null>(null);
 
   const cleanupCamera = useCallback(() => {
     if (barcodeReaderRef.current) {
@@ -57,6 +74,29 @@ export function Scanner() {
     if (mode === "manual") cleanupCamera();
   }, [mode, cleanupCamera]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(DEVICE_PREFERRED_CAMERA_LOCALSTORAGE_KEY);
+    if (stored) setSelectedCameraId(stored);
+  }, []);
+
+  const loadCameras = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const list = devices.filter((d) => d.kind === "videoinput");
+    setCameras(list);
+    if (!list.length) return;
+    setSelectedCameraId((current) => {
+      if (current && list.some((d) => d.deviceId === current)) return current;
+      const back = list.find((d) => /back|rear|environment/i.test(d.label));
+      return back?.deviceId ?? list[0].deviceId ?? null;
+    });
+  }, []);
+
+  useEffect(() => {
+    void loadCameras();
+  }, [loadCameras]);
+
   const startCamera = useCallback(async () => {
     setStatus({ kind: "starting-camera" });
     setVerdict(null);
@@ -65,8 +105,9 @@ export function Scanner() {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error("Camera not supported in this browser.");
       }
+      cleanupCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
+        video: selectedCameraId ? { deviceId: { exact: selectedCameraId } } : { facingMode: "environment" },
         audio: false,
       });
       streamRef.current = stream;
@@ -74,6 +115,7 @@ export function Scanner() {
       if (!video) throw new Error("Video element missing.");
       video.srcObject = stream;
       await video.play();
+      await loadCameras();
       setStatus({ kind: "camera-ready" });
 
       // Lazy-import ZXing only on the client.
@@ -96,7 +138,79 @@ export function Scanner() {
       setStatus({ kind: "error", message: e instanceof Error ? e.message : "Could not start camera." });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cleanupCamera]);
+  }, [cleanupCamera, loadCameras, selectedCameraId]);
+
+  useEffect(() => {
+    if (!selectedCameraId || typeof window === "undefined") return;
+    window.localStorage.setItem(DEVICE_PREFERRED_CAMERA_LOCALSTORAGE_KEY, selectedCameraId);
+  }, [selectedCameraId]);
+
+  useEffect(() => {
+    if (mode !== "camera" || !streamRef.current) return;
+    void startCamera();
+  }, [mode, selectedCameraId, startCamera]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadState = async () => {
+      try {
+        const res = await fetch("/api/devices/register");
+        if (!res.ok) return;
+        const json = (await res.json()) as { paired?: boolean };
+        if (!cancelled) setDeviceRegistered(Boolean(json.paired));
+      } catch {}
+    };
+    void loadState();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ensureFingerprint = useCallback(() => {
+    const existing = localStorage.getItem(DEVICE_FINGERPRINT_LOCALSTORAGE_KEY);
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    localStorage.setItem(DEVICE_FINGERPRINT_LOCALSTORAGE_KEY, created);
+    return created;
+  }, []);
+
+  const registerThisBrowser = useCallback(async () => {
+    if (registeringDevice || deviceRegistered) return;
+    setRegisteringDevice(true);
+    setPairBannerError(null);
+    try {
+      const res = await fetch("/api/devices/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fingerprint: ensureFingerprint(),
+          kind: kiosk ? "kiosk" : "browser",
+          name: kiosk ? "Kiosk browser" : "Browser scanner",
+        }),
+      });
+      if (res.status === 401) {
+        setPairBannerError("Sign in to pair this browser to your shop account.");
+        return;
+      }
+      if (res.status === 402) {
+        const payload = (await res.json()) as { error?: string };
+        setPairBannerError(
+          payload.error ??
+            "You&apos;re at your 4-installs limit. Add another for $15/mo or revoke an existing device at /admin/devices.",
+        );
+        return;
+      }
+      if (!res.ok) {
+        setPairBannerError("Could not pair this browser right now.");
+        return;
+      }
+      setDeviceRegistered(true);
+    } catch {
+      setPairBannerError("Could not pair this browser right now.");
+    } finally {
+      setRegisteringDevice(false);
+    }
+  }, [deviceRegistered, ensureFingerprint, kiosk, registeringDevice]);
 
   const captureFrame = useCallback((): string | null => {
     const v = videoRef.current;
@@ -131,13 +245,16 @@ export function Scanner() {
         }),
       });
       if (!res.ok) throw new Error(`Identify failed: HTTP ${res.status}`);
-      const json = (await res.json()) as VerdictPayload;
+      const json = (await res.json()) as VerdictResponse;
       setVerdict(json);
       setStatus({ kind: "result" });
+      if (json.scanId && !deviceRegistered) {
+        await registerThisBrowser();
+      }
     } catch (e: unknown) {
       setStatus({ kind: "error", message: e instanceof Error ? e.message : "Identify failed." });
     }
-  }, [captureFrame, cleanupCamera, costBasis]);
+  }, [captureFrame, cleanupCamera, costBasis, deviceRegistered, registerThisBrowser]);
 
   const onBarcode = useCallback(
     async (upc: string) => {
@@ -147,14 +264,17 @@ export function Scanner() {
         const params = new URLSearchParams({ costBasis: costBasis || "0" });
         const res = await fetch(`/api/lookup/${encodeURIComponent(upc)}?${params}`);
         if (!res.ok) throw new Error(`Lookup failed: HTTP ${res.status}`);
-        const json = (await res.json()) as VerdictPayload;
+        const json = (await res.json()) as VerdictResponse;
         setVerdict(json);
         setStatus({ kind: "result" });
+        if (json.scanId && !deviceRegistered) {
+          await registerThisBrowser();
+        }
       } catch (e: unknown) {
         setStatus({ kind: "error", message: e instanceof Error ? e.message : "Lookup failed." });
       }
     },
-    [cleanupCamera, costBasis],
+    [cleanupCamera, costBasis, deviceRegistered, registerThisBrowser],
   );
 
   const onManual = useCallback(async () => {
@@ -181,7 +301,7 @@ export function Scanner() {
         }),
       });
       if (!res.ok) throw new Error(`Search failed: HTTP ${res.status}`);
-      const json = (await res.json()) as VerdictPayload;
+      const json = (await res.json()) as VerdictResponse;
       // Override the identified title with the user's text so the result feels honest.
       json.identify.title = q;
       json.identify.query = q;
@@ -189,21 +309,55 @@ export function Scanner() {
       json.identify.confidence = 0.7;
       setVerdict(json);
       setStatus({ kind: "result" });
+      if (json.scanId && !deviceRegistered) {
+        await registerThisBrowser();
+      }
     } catch (e: unknown) {
       setStatus({ kind: "error", message: e instanceof Error ? e.message : "Search failed." });
     }
-  }, [manualQuery, costBasis, onBarcode]);
+  }, [manualQuery, costBasis, deviceRegistered, onBarcode, registerThisBrowser]);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     cleanupCamera();
     setVerdict(null);
     setPreviewUrl(null);
     setStatus({ kind: "idle" });
-  };
+  }, [cleanupCamera]);
+
+  useEffect(() => {
+    if (!kiosk || status.kind !== "result") {
+      setKioskCountdown(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setKioskCountdown(5), 25_000);
+    return () => window.clearTimeout(timer);
+  }, [kiosk, status.kind]);
+
+  useEffect(() => {
+    if (!kiosk || kioskCountdown == null) return;
+    if (kioskCountdown <= 0) {
+      reset();
+      void startCamera();
+      return;
+    }
+    const tick = window.setTimeout(() => {
+      setKioskCountdown((v) => (v == null ? null : v - 1));
+    }, 1000);
+    return () => window.clearTimeout(tick);
+  }, [kiosk, kioskCountdown, reset, startCamera]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className={`grid gap-6 ${kiosk ? "h-full grid-cols-1 xl:grid-cols-2" : "lg:grid-cols-2"}`}>
       <section aria-label="Capture" className="card flex flex-col">
+        {!kiosk && !deviceRegistered ? (
+          <p className="mb-3 rounded-md border border-mint-500/30 bg-mint-50/60 px-3 py-2 text-xs text-ink">
+            This browser will count as 1 of your 4 scanner installs once you save your first scan. Already paired?{" "}
+            <a href="/login" className="font-medium text-mint-600 hover:underline">
+              Sign in
+            </a>
+            .
+          </p>
+        ) : null}
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex gap-1.5">
             <button
@@ -256,14 +410,39 @@ export function Scanner() {
 
             <canvas ref={canvasRef} className="hidden" />
 
+            {cameras.length > 1 ? (
+              <label className="mt-4 block text-xs font-medium text-brand-mute">
+                Camera source
+                <select
+                  className="mt-1 block w-full rounded-md border border-brand-ink/20 bg-white px-3 py-2 text-sm text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  value={selectedCameraId ?? ""}
+                  onChange={(e) => setSelectedCameraId(e.target.value || null)}
+                >
+                  {cameras.map((camera, i) => (
+                    <option key={camera.deviceId || `camera-${i}`} value={camera.deviceId}>
+                      {camera.label || `Camera ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             <div className="mt-4 flex items-center gap-3">
               {streamRef.current ? (
-                <button type="button" onClick={onShutter} className="btn-accent flex-1">
+                <button
+                  type="button"
+                  onClick={onShutter}
+                  className={`btn-accent flex-1 ${kiosk ? "min-h-[64px] text-2xl" : ""}`}
+                >
                   <Camera aria-hidden className="mr-2 h-4 w-4" />
                   Snap &amp; identify
                 </button>
               ) : (
-                <button type="button" onClick={startCamera} className="btn-accent flex-1">
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className={`btn-accent flex-1 ${kiosk ? "min-h-[64px] text-2xl" : ""}`}
+                >
                   <Camera aria-hidden className="mr-2 h-4 w-4" />
                   Start camera
                 </button>
@@ -272,6 +451,12 @@ export function Scanner() {
                 <RefreshCcw className="h-4 w-4" />
               </button>
             </div>
+            {registeringDevice ? (
+              <p className="mt-2 text-xs text-brand-mute">Pairing this browser to your account…</p>
+            ) : null}
+            {pairBannerError ? (
+              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{pairBannerError}</p>
+            ) : null}
           </>
         ) : (
           <div className="flex flex-col gap-4">
@@ -318,7 +503,7 @@ export function Scanner() {
 
       <section aria-label="Result" className="flex flex-col">
         {verdict ? (
-          <PriceVerdict payload={verdict} />
+          <TagPriceCard payload={verdict} />
         ) : (
           <div className="card flex flex-1 items-center justify-center text-center">
             <div className="max-w-xs">
@@ -335,7 +520,7 @@ export function Scanner() {
                     Looking up sold comps&hellip;
                   </>
                 ) : (
-                  "Snap a photo or type a query to get a buy / skip verdict."
+                  "Snap a photo or type a query to get a suggested tag price."
                 )}
               </p>
               <p className="mt-2 text-xs text-brand-mute">
@@ -345,6 +530,51 @@ export function Scanner() {
           </div>
         )}
       </section>
+
+      {kiosk ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setKioskHelpOpen(true)}
+            className="fixed right-4 top-4 z-50 inline-flex min-h-[64px] items-center gap-2 rounded-xl border border-line bg-white px-5 text-lg font-semibold text-ink shadow-soft"
+          >
+            <CircleHelp className="h-5 w-5" />
+            Help
+          </button>
+          {kioskCountdown != null ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 text-white">
+              <div className="rounded-2xl border border-mint-500/40 bg-ink px-8 py-6 text-center">
+                <p className="text-3xl font-semibold">Returning to camera in {kioskCountdown}...</p>
+              </div>
+            </div>
+          ) : null}
+          {kioskHelpOpen ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+              <div className="w-full max-w-2xl rounded-2xl bg-white p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold text-ink">How to use this scanner</h2>
+                  <button
+                    type="button"
+                    onClick={() => setKioskHelpOpen(false)}
+                    className="rounded-lg border border-line p-2 text-ink"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <ol className="space-y-2 text-lg text-ink">
+                  <li>1. Place the item under the camera.</li>
+                  <li>2. Tap Snap &amp; identify to get suggested tag pricing.</li>
+                  <li>3. Use the result card to set your sticker price.</li>
+                </ol>
+                <p className="mt-4 rounded-lg bg-cream px-4 py-3 text-sm text-soft">
+                  Privacy: scanner images are processed to identify the item and return pricing context. We do not use
+                  scan images for unrelated advertising profiles.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }

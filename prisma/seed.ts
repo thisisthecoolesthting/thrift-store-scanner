@@ -64,6 +64,7 @@ async function main() {
         data: {
           tenantId: tenant.id,
           name: `Scanner ${i + 1} — ${users[i].name.split(" ")[0]}`,
+          kind: i >= 3 ? "browser" : "phone",
           installFingerprint: `seed-fp-${i}`,
           status: "active",
           lastSeenAt: new Date(),
