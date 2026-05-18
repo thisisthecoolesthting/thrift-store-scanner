@@ -1,0 +1,30 @@
+**PriceScout helps thrift-store crews price donated items fast and confidently.**
+
+Open the scanner, snap an item, and get a defensible suggested tag price in seconds.
+PriceScout is built for thrift stores, estate-sale teams, and yard-sale operators who need speed and consistency at the sorting table.
+
+**What you get**
+- Fast camera-based item scans on Android
+- Suggested tag price backed by real sold-comparable data
+- Confidence signals like comp sample size and median
+- Shared crew workflow so multiple staff can price in parallel
+- Pricing tiers that fit weekend events or year-round stores
+
+**Built for real floor operations**
+PriceScout is designed for teams who sort donations and inventory in batches.
+Instead of guessing or searching manually, your team snaps and gets a clear pricing recommendation that keeps tags consistent across shifts.
+
+**From scan to sale-ready**
+1. Open the scanner
+2. Snap the item
+3. Review comps and suggested tag price
+4. Save the result for team visibility
+5. Move to the next item
+
+**Who uses PriceScout**
+- Thrift store staff and managers
+- Estate-sale crews
+- Yard-sale operators
+- Multi-table resale teams that need consistent pricing decisions
+
+PriceScout keeps your pricing process quick, repeatable, and easier to train across the whole crew.

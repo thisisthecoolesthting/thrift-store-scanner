@@ -1,0 +1,50 @@
+{
+  "dispatch_id": "PRICESCOUT-WALKTHROUGH-VIDEO-004",
+  "path_selected": "Path B (operator-recorded Vimeo embed)",
+  "branch": "main",
+  "status": "completed_with_operator_followups",
+  "completed_at": "2026-05-18",
+  "files_changed": [
+    ".env.example",
+    "src/app/watch/page.tsx",
+    "src/app/watch/opengraph-image.tsx",
+    "src/app/opengraph-image.tsx",
+    "mobile/store-listing/play/feature-graphic.placeholder.md",
+    "mobile/store-listing/play/short-description.txt",
+    "mobile/store-listing/play/long-description.txt",
+    "mobile/store-listing/play/whats-new.txt",
+    "mobile/store-listing/play/screenshots/README.md",
+    "mobile/store-listing/apple/screenshots/README.md",
+    "cursor-dispatch/inbox/2026-04-29-004-pricescout-walkthrough-video.reply.md",
+    "cursor-dispatch/done/004-pricescout-walkthrough-video-and-screenshots.prompt.md"
+  ],
+  "validation": {
+    "typecheck": {
+      "status": "failed_preexisting",
+      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "notes": [
+        "Pre-existing Prisma/model typing errors in device + fb listing routes unrelated to dispatch 004."
+      ]
+    },
+    "tests": {
+      "status": "passed",
+      "command": "node node_modules/vitest/vitest.mjs run",
+      "summary": "2 test files passed, 4 tests passed"
+    },
+    "build": {
+      "status": "failed_preexisting",
+      "command": "node node_modules/next/dist/bin/next build",
+      "notes": [
+        "Pre-existing build failure from src/lib/device-utils.ts importing next/headers into code path consumed by pages-compatible bundle."
+      ]
+    }
+  },
+  "operator_blocked_followups": [
+    "Record 60-90 second Android walkthrough and upload to Vimeo Unlisted.",
+    "Set NEXT_PUBLIC_VIMEO_WALKTHROUGH_ID in production environment with real Vimeo ID.",
+    "Capture and drop real Play Store screenshots and final feature-graphic.png assets."
+  ],
+  "deferred": {
+    "path_a_playwright_capture": "Deferred until Stripe + DB seed dependencies are complete; dispatch 006 (seed/demo-data) remains an unblocker."
+  }
+}

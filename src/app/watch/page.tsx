@@ -30,16 +30,24 @@ export default function WatchPage() {
         <div className="container-pricescout">
           <div className="mx-auto max-w-4xl">
             <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-line bg-ink shadow-[0_30px_60px_-20px_rgba(17,203,157,0.25)]">
-              <video
-                className="h-full w-full object-cover"
-                controls
-                playsInline
-                muted
-                poster="/images/app-interface.jpg"
-                preload="metadata"
-              >
-                <source src="/videos/walkthrough.webm" type="video/webm" />
-              </video>
+              {process.env.NEXT_PUBLIC_VIMEO_WALKTHROUGH_ID ? (
+                <iframe
+                  src={`https://player.vimeo.com/video/${process.env.NEXT_PUBLIC_VIMEO_WALKTHROUGH_ID}?autoplay=0&loop=0&muted=1&title=0&byline=0&portrait=0`}
+                  className="h-full w-full"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title="PriceScout walkthrough"
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                  <p className="text-soft">
+                    Walkthrough video coming soon &mdash; in the meantime, <Link href="/scan" className="text-mint-600 underline">try the scanner</Link>.
+                  </p>
+                  <video className="mt-6 hidden h-full w-full max-w-2xl rounded-xl object-cover sm:block" controls playsInline muted poster="/images/app-interface.jpg" preload="metadata">
+                    <source src="/videos/walkthrough.webm" type="video/webm" />
+                  </video>
+                </div>
+              )}
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent" aria-hidden />
               <div className="pointer-events-none absolute bottom-6 left-0 right-0 flex justify-center">
                 <Link
