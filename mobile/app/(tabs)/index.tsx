@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Image,
   ScrollView,
   StyleSheet,
@@ -10,11 +11,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Camera as CameraIcon, RefreshCw } from "lucide-react-native";
 import { colors, radii, space } from "@/lib/brand";
 import { identifyFromImage, lookupByUpc, type IdentifyResponse } from "@/lib/api";
 import { saveScan } from "@/lib/storage";
+import {
+  buildListingCopy,
+  openFacebookMarketplaceComposer,
+  type FbMobileCategory,
+  type FbMobileDraft,
+} from "@/lib/marketplace";
 
 type Phase =
   | { kind: "idle" }
@@ -30,6 +38,10 @@ export default function ScanScreen() {
   const camRef = useRef<CameraView | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [costBasis, setCostBasis] = useState<string>("3.00");
+  const [listingVisible, setListingVisible] = useState(false);
+  const [listingBusy, setListingBusy] = useState(false);
+  const [listingDraft, setListingDraft] = useState<FbMobileDraft | null>(null);
+  const [listingHint, setListingHint] = useState<string | null>(null);
 
   // Permission gate
   if (!permission) {
@@ -95,6 +107,70 @@ export default function ScanScreen() {
 
   const reset = () => setPhase({ kind: "ready" });
 
+  const onPostToMarketplace = async () => {
+    if (phase.kind !== "result") return;
+    if (!phase.payload.scanId) {
+      Alert.alert("Sign in required", "Sign in on this device to create Marketplace drafts.");
+      return;
+    }
+    setListingBusy(true);
+    try {
+      const median = phase.payload.comp.median ?? 12;
+      const priceCents = Math.max(100, Math.round(median * 0.8 * 100));
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL ?? "https://pricescout.pro"}/api/scans/${phase.payload.scanId}/fb-listing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ priceCents }),
+      });
+      if (!res.ok) throw new Error(`Draft failed: HTTP ${res.status}`);
+      const json = (await res.json()) as { draft: FbMobileDraft };
+      setListingDraft(json.draft);
+      setListingVisible(true);
+      setListingHint(null);
+    } catch (e) {
+      Alert.alert("Marketplace draft failed", e instanceof Error ? e.message : "Could not create listing draft.");
+    } finally {
+      setListingBusy(false);
+    }
+  };
+
+  const onSaveListingDraft = async () => {
+    if (phase.kind !== "result" || !phase.payload.scanId || !listingDraft) return;
+    setListingBusy(true);
+    try {
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL ?? "https://pricescout.pro"}/api/scans/${phase.payload.scanId}/fb-listing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(listingDraft),
+      });
+      if (!res.ok) throw new Error(`Save failed: HTTP ${res.status}`);
+      setListingHint("Draft saved.");
+    } catch (e) {
+      Alert.alert("Save failed", e instanceof Error ? e.message : "Could not save draft.");
+    } finally {
+      setListingBusy(false);
+    }
+  };
+
+  const onCopyAndOpenFb = async () => {
+    if (phase.kind !== "result" || !phase.payload.scanId || !listingDraft) return;
+    setListingBusy(true);
+    try {
+      await Clipboard.setStringAsync(buildListingCopy(listingDraft));
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL ?? "https://pricescout.pro"}/api/scans/${phase.payload.scanId}/fb-listing`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "copied" }),
+      });
+      await openFacebookMarketplaceComposer();
+      setListingHint("Copied listing text and opened Marketplace.");
+    } catch (e) {
+      Alert.alert("Marketplace flow failed", e instanceof Error ? e.message : "Could not open Marketplace.");
+    } finally {
+      setListingBusy(false);
+    }
+  };
+
   return (
     <View style={s.root}>
       {phase.kind === "idle" || phase.kind === "starting" || phase.kind === "ready" ? (
@@ -120,6 +196,9 @@ export default function ScanScreen() {
           <View style={s.row}>
             <Pressable label="Save to flip log" onPress={onSave} primary />
             <Pressable label="Scan again" onPress={reset} icon={<RefreshCw size={16} color={colors.ink} />} />
+          </View>
+          <View style={{ marginTop: 10 }}>
+            <Pressable label={listingBusy ? "Building listing..." : "Post to Marketplace"} onPress={onPostToMarketplace} primary />
           </View>
         </ScrollView>
       ) : null}
@@ -164,6 +243,65 @@ export default function ScanScreen() {
           <View style={{ width: 110 }} />
         </View>
       ) : null}
+
+      <Modal visible={listingVisible} animationType="slide" onRequestClose={() => setListingVisible(false)}>
+        <ScrollView contentContainerStyle={s.listingModalPad}>
+          <Text style={s.h1}>Marketplace listing</Text>
+          {listingDraft ? (
+            <>
+              <Field label={`Title (${listingDraft.title.length}/80)`}>
+                <TextInput
+                  value={listingDraft.title}
+                  onChangeText={(t) => setListingDraft({ ...listingDraft, title: t.slice(0, 80) })}
+                  style={s.input}
+                />
+              </Field>
+
+              <Field label="Category (FB may re-map)">
+                <TextInput
+                  value={listingDraft.category}
+                  onChangeText={(t) => setListingDraft({ ...listingDraft, category: normalizeCategory(t) })}
+                  style={s.input}
+                />
+              </Field>
+
+              <Field label="Price">
+                <TextInput
+                  keyboardType="number-pad"
+                  value={String(Math.max(1, Math.round(listingDraft.priceCents / 100)))}
+                  onChangeText={(t) =>
+                    setListingDraft({
+                      ...listingDraft,
+                      priceCents: Math.max(100, Math.round((Number(t) || 1) * 100)),
+                    })
+                  }
+                  style={s.input}
+                />
+              </Field>
+
+              <Field label={`Description (${listingDraft.description.length}/1000)`}>
+                <TextInput
+                  multiline
+                  value={listingDraft.description}
+                  onChangeText={(t) => setListingDraft({ ...listingDraft, description: t.slice(0, 1000) })}
+                  style={[s.input, { minHeight: 140, textAlignVertical: "top" }]}
+                />
+              </Field>
+
+              <View style={s.row}>
+                <Pressable label="Save as draft" onPress={onSaveListingDraft} />
+              </View>
+              <View style={[s.row, { marginTop: 8 }]}>
+                <Pressable label="Copy listing + open FB Marketplace" onPress={onCopyAndOpenFb} primary />
+              </View>
+              <View style={[s.row, { marginTop: 8 }]}>
+                <Pressable label="Close" onPress={() => setListingVisible(false)} />
+              </View>
+              {listingHint ? <Text style={[s.bodyMuted, { marginTop: 8 }]}>{listingHint}</Text> : null}
+            </>
+          ) : null}
+        </ScrollView>
+      </Modal>
     </View>
   );
 }
@@ -223,12 +361,40 @@ function Pressable({
   );
 }
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={[s.costLabel, { color: colors.muted, marginBottom: 6 }]}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function normalizeCategory(input: string): FbMobileCategory {
+  const candidate = input.trim();
+  const allowed: FbMobileCategory[] = [
+    "Apparel",
+    "Books",
+    "Electronics",
+    "Furniture",
+    "Home",
+    "Kids",
+    "Music",
+    "Tools",
+    "Toys",
+    "Sports",
+    "Other",
+  ];
+  return (allowed.find((v) => v.toLowerCase() === candidate.toLowerCase()) ?? "Other") as FbMobileCategory;
+}
+
 function stripHtml(s: string): string {
   return s.replace(/&middot;/g, "·").replace(/&mdash;/g, "—").replace(/<[^>]+>/g, "");
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.ink },
+  listingModalPad: { padding: space[4], backgroundColor: colors.cream, minHeight: "100%" },
   cameraWrap: { flex: 1, position: "relative" },
   camera: { flex: 1 },
   reticle: {
@@ -279,6 +445,16 @@ const s = StyleSheet.create({
   },
   costPrefix: { color: colors.muted, marginRight: 4 },
   costInput: { flex: 1, color: colors.ink, fontSize: 16, padding: 0 },
+  input: {
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    borderColor: colors.line,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.ink,
+  },
   shutter: {
     width: 78,
     height: 78,

@@ -1,16 +1,39 @@
 {
-  "dispatch": "PRICESCOUT-FB-MARKETPLACE-007",
+  "dispatch_id": "PRICESCOUT-FB-MARKETPLACE-007",
   "branch": "main",
-  "mode": "Mode 1 — structured listing + copy + FB deep link",
+  "mode": "Mode 1 - structured listing + copy + deep link",
+  "node_runtime": "C:\\Users\\reasn\\AppData\\Local\\nvm\\v20.20.2\\node.exe",
   "checks": {
-    "npm_run_typecheck": { "exit_code": 0 },
-    "npm_run_test": { "exit_code": 0 }
+    "npx_prisma_generate": {
+      "exit_code": 0,
+      "command": "npx prisma generate"
+    },
+    "npm_run_typecheck": {
+      "exit_code": 0,
+      "command": "npm run typecheck"
+    },
+    "npm_run_test": {
+      "exit_code": 0,
+      "command": "npm run test",
+      "tests_passed": 4
+    },
+    "npm_run_build": {
+      "exit_code": 0,
+      "command": "npm run build"
+    }
   },
   "features": [
-    "Scan fbListing* fields + migration 20260518144000_fb_listing_fields",
-    "GET/PATCH /api/scans/[id]/fb-listing",
-    "TagPriceCard FB copy + open Marketplace flow",
-    "Admin scans MarketplaceStatusPill",
-    "mobile/lib/marketplace.ts helper"
+    "Prisma Scan fbListing* fields with migration 20260518144000_fb_listing_fields",
+    "Listing generator in src/lib/fb-listing.ts with title/category/price/description templates",
+    "GET/POST/PATCH /api/scans/[id]/fb-listing with draft and status transitions",
+    "TagPriceCard slide-over editor with copy listing + open Facebook Marketplace flow",
+    "Mobile marketplace flow with clipboard copy + fb:// deep link fallback to web URL",
+    "Admin scans Marketplace status column + filter + toggle pill",
+    "Admin dashboard Tag list pulse counts",
+    "scripts/fb-listing-from-scan.ts CLI draft generator"
+  ],
+  "notes": [
+    "Build on Node v24 showed transient Next manifest ENOENT on this Windows host.",
+    "Required command suite passed end-to-end on Node v20.20.2."
   ]
 }
