@@ -37,6 +37,8 @@ Implemented Path B wiring for `/watch` and completed listing asset scaffolding.
 - Path A (Playwright-generated walkthrough capture) is deferred pending seeded DB/auth/Stripe readiness; dispatch 006 remains part of the unblock chain.
 
 ## Validation
-- Typecheck: failed due to pre-existing unrelated Prisma/type issues in current branch state.
+- Node runtime used: `C:\Users\reasn\AppData\Local\nvm\v24.14.1` (`node v24.14.1`, `npm 11.11.0`)
+- Prisma generate: passed (`npx prisma generate`)
+- Typecheck: failed due to pre-existing errors in `src/app/scan/kiosk/page.tsx` (duplicate `metadata` / default export declarations).
 - Tests: passed (`vitest`, 4/4 tests).
-- Build: failed due to pre-existing unrelated `next/headers` import path issue in `src/lib/device-utils.ts`.
+- Build: failed due to pre-existing Next.js route entry error: cannot resolve `src/app/scan/kiosk/page.tsx`.

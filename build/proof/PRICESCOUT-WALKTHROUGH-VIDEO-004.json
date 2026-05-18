@@ -19,23 +19,32 @@
     "cursor-dispatch/done/004-pricescout-walkthrough-video-and-screenshots.prompt.md"
   ],
   "validation": {
+    "environment": {
+      "node_path": "C:\\Users\\reasn\\AppData\\Local\\nvm\\v24.14.1",
+      "node_version": "v24.14.1",
+      "npm_version": "11.11.0"
+    },
+    "prisma_generate": {
+      "status": "passed",
+      "command": "npx prisma generate"
+    },
     "typecheck": {
       "status": "failed_preexisting",
-      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "command": "npm run typecheck",
       "notes": [
-        "Pre-existing Prisma/model typing errors in device + fb listing routes unrelated to dispatch 004."
+        "Pre-existing duplicate export/type errors in src/app/scan/kiosk/page.tsx (metadata/default redeclarations)."
       ]
     },
     "tests": {
       "status": "passed",
-      "command": "node node_modules/vitest/vitest.mjs run",
+      "command": "npm run test",
       "summary": "2 test files passed, 4 tests passed"
     },
     "build": {
       "status": "failed_preexisting",
-      "command": "node node_modules/next/dist/bin/next build",
+      "command": "npm run build",
       "notes": [
-        "Pre-existing build failure from src/lib/device-utils.ts importing next/headers into code path consumed by pages-compatible bundle."
+        "Pre-existing route-module issue: Cannot find module 'src/app/scan/kiosk/page.tsx' during Next.js entry resolution."
       ]
     }
   },
