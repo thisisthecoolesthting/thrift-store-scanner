@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 
-const API_VERSION = "2024-12-18.acacia";
+const API_VERSION = "2025-02-24.acacia";
 
 export type CheckoutTier =
   | "week_pass"
@@ -28,6 +28,7 @@ export function checkoutMode(tier: CheckoutTier): Stripe.Checkout.SessionCreateP
   return "subscription";
 }
 
+/** @deprecated alias for older checkout route imports */
 export const tierCheckoutMode = checkoutMode;
 
 export function priceIdForTier(tier: CheckoutTier): string | undefined {
