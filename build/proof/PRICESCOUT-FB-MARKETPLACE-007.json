@@ -1,0 +1,16 @@
+{
+  "dispatch": "PRICESCOUT-FB-MARKETPLACE-007",
+  "branch": "main",
+  "mode": "Mode 1 — structured listing + copy + FB deep link",
+  "checks": {
+    "npm_run_typecheck": { "exit_code": 0 },
+    "npm_run_test": { "exit_code": 0 }
+  },
+  "features": [
+    "Scan fbListing* fields + migration 20260518144000_fb_listing_fields",
+    "GET/PATCH /api/scans/[id]/fb-listing",
+    "TagPriceCard FB copy + open Marketplace flow",
+    "Admin scans MarketplaceStatusPill",
+    "mobile/lib/marketplace.ts helper"
+  ]
+}

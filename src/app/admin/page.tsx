@@ -10,8 +10,12 @@ export default async function AdminDashboardPage() {
   if (!session) return null;
 
   const tenantId = session.tenantId;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - 7);
 
-  const [totalScans, recent, categories] = await Promise.all([
+  const [totalScans, recent, categories, todaysPricings, draftedListings, postedListings, soldThisWeek] = await Promise.all([
     prisma.scan.count({ where: { tenantId } }),
     prisma.scan.findMany({
       where: { tenantId },
@@ -24,6 +28,10 @@ export default async function AdminDashboardPage() {
       where: { tenantId },
       _count: { _all: true },
     }),
+    prisma.scan.count({ where: { tenantId, scannedAt: { gte: todayStart } } }),
+    prisma.scan.count({ where: { tenantId, fbListingStatus: "draft" } }),
+    prisma.scan.count({ where: { tenantId, fbListingStatus: "posted" } }),
+    prisma.scan.count({ where: { tenantId, fbListingStatus: "sold", fbListingPostedAt: { gte: weekStart } } }),
   ]);
 
   const hist = [...categories].sort((a, b) => (b._count._all ?? 0) - (a._count._all ?? 0));
@@ -54,6 +62,21 @@ export default async function AdminDashboardPage() {
           </ul>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-line/60 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="text-xl font-semibold text-ink">Tag list pulse</h2>
+          <Link href="/admin/scans" className="text-sm font-medium text-mint-700 underline">
+            Open scans
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <PulseStat label="Today&apos;s pricings" value={todaysPricings} />
+          <PulseStat label="Drafted listings" value={draftedListings} />
+          <PulseStat label="Posted to FB" value={postedListings} />
+          <PulseStat label="Sold this week" value={soldThisWeek} />
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-line/60 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-4">
@@ -89,6 +112,15 @@ export default async function AdminDashboardPage() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function PulseStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-line/60 bg-cream/40 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-soft">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{value}</p>
     </div>
   );
 }
