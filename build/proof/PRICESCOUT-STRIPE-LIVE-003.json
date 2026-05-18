@@ -1,0 +1,36 @@
+{
+  "dispatch": "PRICESCOUT-STRIPE-LIVE-003",
+  "branch": "main",
+  "checks": {
+    "lib_stripe": "src/lib/stripe.ts",
+    "checkout_post": "POST /api/billing/checkout JSON { tier, quantity? }",
+    "checkout_get": "GET /api/billing/checkout?tier= legacy redirect",
+    "webhook_events": [
+      "checkout.session.completed",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "invoice.payment_failed"
+    ],
+    "ui": ["/pricing CheckoutButton", "/billing/success", "/admin/billing portal"]
+  },
+  "operator_stripe_dashboard": {
+    "webhook_url": "https://pricescout.pro/api/billing/webhook",
+    "events": [
+      "checkout.session.completed",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "invoice.payment_failed"
+    ],
+    "env_vps": [
+      "STRIPE_SECRET_KEY",
+      "STRIPE_PUBLISHABLE_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PRICE_WEEK_PASS",
+      "STRIPE_PRICE_PRO_MONTHLY",
+      "STRIPE_PRICE_PRO_ANNUAL",
+      "STRIPE_PRICE_FOUNDERS_LIFETIME",
+      "STRIPE_PRICE_DEVICE_ADDON"
+    ]
+  },
+  "note": "npm typecheck not run in agent shell (npm not on PATH). Operator smoke: POST checkout week_pass returns checkout.stripe.com URL when keys set."
+}

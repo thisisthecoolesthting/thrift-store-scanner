@@ -1,93 +1,95 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
-import { checkoutTierSchema } from "@/lib/api-schemas";
+import { randomUUID } from "crypto";
+import { checkoutBodySchema, checkoutTierSchema } from "@/lib/api-schemas";
+import { getSession } from "@/lib/session";
+import { getStripe, priceIdForTier, tierCheckoutMode, type CheckoutTier } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function stripe(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key);
-}
-
-/** Tier checkout modes — Stripe Price objects must match mode at Stripe dashboard. */
-function tierCheckoutMode(tier: string): "subscription" | "payment" {
-  if (tier === "week_pass" || tier === "founders_lifetime") return "payment";
-  return "subscription";
-}
-
-export async function GET(req: Request) {
+function appOrigin(req: Request): string {
   const url = new URL(req.url);
-  const tierRaw = url.searchParams.get("tier");
-  const tierParsed = tierRaw ? checkoutTierSchema.safeParse(tierRaw) : { success: false as const };
-  if (!tierParsed.success) {
-    return NextResponse.json(
-      {
-        error: "Unknown tier",
-        message: "That tier isn't recognized. Pick a tier from the pricing page.",
-      },
-      { status: 400 },
-    );
-  }
+  return process.env.NEXT_PUBLIC_APP_URL ?? `${url.protocol}//${url.host}`;
+}
 
-  const tier = tierParsed.data;
+async function createCheckoutSession(
+  req: Request,
+  tier: CheckoutTier,
+  quantity: number,
+): Promise<NextResponse> {
+  const client = getStripe();
+  const priceId = priceIdForTier(tier);
 
-  const tierMap: Record<string, string | undefined> = {
-    week_pass: process.env.STRIPE_PRICE_WEEK_PASS,
-    pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY,
-    pro_annual: process.env.STRIPE_PRICE_PRO_ANNUAL,
-    founders_lifetime: process.env.STRIPE_PRICE_FOUNDERS_LIFETIME,
-  };
-
-  const priceId = tierMap[tier];
-  const client = stripe();
-
-  if (!priceId || !client) {
+  if (!client || !priceId) {
     return NextResponse.json(
       {
         error: "billing_not_ready",
         message:
-          "Billing is being set up right now. Email hello@pricescout.pro and we'll lock in your tier and reach out the moment the gateway is live.",
+          "Billing is being set up. Email hello@pricescout.pro and we will lock in your tier when the gateway is live.",
         tier,
       },
       { status: 503 },
     );
   }
 
-  if (tier === "founders_lifetime") {
-    // Founders-lifetime cap check belongs here — requires Stripe Search/List or DB mirror of payments.
-    // Until persisted counters exist, operators enforce manually — metadata hooks prepared below.
+  const session = await getSession();
+  const origin = appOrigin(req);
+
+  const checkout = await client.checkout.sessions.create({
+    mode: tierCheckoutMode(tier),
+    line_items: [{ price: priceId, quantity }],
+    success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/pricing?canceled=1`,
+    customer_email: session?.email,
+    client_reference_id: session?.tenantId ?? `guest-${randomUUID()}`,
+    metadata: {
+      tier,
+      tenantId: session?.tenantId ?? "",
+      userId: session?.userId ?? "",
+      tenant_slug: process.env.DEFAULT_TENANT_SLUG ?? "",
+    },
+    allow_promotion_codes: true,
+    billing_address_collection: "auto",
+  });
+
+  if (!checkout.url) {
+    return NextResponse.json({ error: "stripe_no_url" }, { status: 500 });
   }
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ?? `${url.protocol}//${url.host}`;
+  return NextResponse.json({ url: checkout.url });
+}
 
+/** POST JSON { tier, quantity? } — primary path for CheckoutButton. */
+export async function POST(req: Request) {
+  let body: unknown;
   try {
-    const session = await client.checkout.sessions.create({
-      mode: tierCheckoutMode(tier),
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/pricing?checkout=success&tier=${encodeURIComponent(tier)}`,
-      cancel_url: `${origin}/pricing?checkout=cancel`,
-      metadata: {
-        tier,
-        tenant_slug: process.env.DEFAULT_TENANT_SLUG ?? "demo-thrift",
-      },
-    });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
 
-    if (!session.url) {
-      return NextResponse.json({ error: "stripe_no_url" }, { status: 500 });
-    }
-
-    return NextResponse.redirect(session.url, 303);
-  } catch (e) {
-    console.error(e);
+  const parsed = checkoutBodySchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      {
-        error: "stripe_session_failed",
-        message: "Checkout could not start — verify Stripe Price IDs match checkout mode.",
-      },
-      { status: 502 },
+      { error: "unknown_tier", message: "That tier is not recognized." },
+      { status: 400 },
     );
   }
+
+  return createCheckoutSession(req, parsed.data.tier, parsed.data.quantity ?? 1);
+}
+
+/** GET ?tier=… — legacy redirect for bookmarked pricing links. */
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const tierRaw = url.searchParams.get("tier");
+  const tierParsed = tierRaw ? checkoutTierSchema.safeParse(tierRaw) : { success: false as const };
+  if (!tierParsed.success) {
+    return NextResponse.json({ error: "unknown_tier" }, { status: 400 });
+  }
+
+  const res = await createCheckoutSession(req, tierParsed.data, 1);
+  if (res.status !== 200) return res;
+  const { url: checkoutUrl } = (await res.json()) as { url: string };
+  return NextResponse.redirect(checkoutUrl, 303);
 }

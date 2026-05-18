@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
+import { getStripe } from "@/lib/stripe";
 import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function stripe(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key);
-}
 
 /** POST authenticated session → Stripe Billing Portal URL. */
 export async function POST(req: Request) {
@@ -25,7 +19,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const client = stripe();
+  const client = getStripe();
   if (!client) {
     return NextResponse.json(
       { error: "billing_not_ready", message: "Stripe billing is not configured yet for this deployment." },

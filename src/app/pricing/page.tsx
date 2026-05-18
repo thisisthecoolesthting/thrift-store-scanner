@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { PricingTiers } from "@/components/PricingTiers";
+import { PricingCancelToast } from "@/components/PricingCancelToast";
 import { FAQ } from "@/components/FAQ";
 import { brand } from "@/lib/brand";
 import EbayTrustStrip from "@/components/EbayTrustStrip";
@@ -28,9 +30,13 @@ export default function PricingPage() {
         <div className="section-header-center">
           <h1 className="section-title">Pricing that fits the size of your operation</h1>
           <p className="section-subtitle">
-            Running a one-weekend yard sale? Grab a Week Pass. Running a thrift store year-round? Pro Annual saves you ~17%. Up to 4 scanners on every tier; add more for $15/mo each.
+            Running a one-weekend yard sale? Grab a Week Pass. Running a thrift store year-round? Pro Annual saves you
+            ~17%. Up to 4 scanners on every tier; add more for $15/mo each.
           </p>
         </div>
+        <Suspense fallback={null}>
+          <PricingCancelToast />
+        </Suspense>
         <div className="mt-16">
           <PricingTiers />
         </div>
@@ -40,11 +46,12 @@ export default function PricingPage() {
         </div>
         <div className="mx-auto mt-12 max-w-2xl text-center text-sm text-soft">
           <p>
-            Stripe handles billing. Cancel anytime. Founders Lifetime is a one-time purchase &mdash; no
-            subscription, no renewals.
+            Stripe handles billing. Cancel anytime. Founders Lifetime is a one-time purchase &mdash; no subscription,
+            no renewals.
           </p>
           <p className="mt-2">
-            Each subscription runs across up to 4 scanner installs (Android live; iOS in review). Add additional scanners for $15/month each &mdash; manage devices in the app&rsquo;s Devices tab.
+            Each subscription runs across up to 4 scanner installs (Android live; iOS in review). Add additional
+            scanners for $15/month each &mdash; manage devices in the app&rsquo;s Devices tab.
           </p>
         </div>
       </div>

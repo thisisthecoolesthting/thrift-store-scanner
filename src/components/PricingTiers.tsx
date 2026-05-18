@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { Check, Sparkles, Smartphone } from "lucide-react";
+import { CheckoutButton } from "@/components/CheckoutButton";
+import type { CheckoutTier } from "@/lib/stripe";
 
 interface Tier {
-  id: string;
+  id: CheckoutTier;
   name: string;
   currency: string;
   amount: string;
@@ -12,7 +13,6 @@ interface Tier {
   featured?: boolean;
   features: string[];
   ctaLabel: string;
-  ctaHref: string;
 }
 
 const TIERS: Tier[] = [
@@ -31,7 +31,6 @@ const TIERS: Tier[] = [
       "No auto-renew",
     ],
     ctaLabel: "Buy a Week Pass",
-    ctaHref: "/api/billing/checkout?tier=week_pass",
   },
   {
     id: "pro_monthly",
@@ -49,7 +48,6 @@ const TIERS: Tier[] = [
       "Email support",
     ],
     ctaLabel: "Start Pro Monthly",
-    ctaHref: "/api/billing/checkout?tier=pro_monthly",
   },
   {
     id: "pro_annual",
@@ -69,7 +67,6 @@ const TIERS: Tier[] = [
       "Best for stores running year-round",
     ],
     ctaLabel: "Upgrade to Annual",
-    ctaHref: "/api/billing/checkout?tier=pro_annual",
   },
   {
     id: "founders_lifetime",
@@ -87,7 +84,6 @@ const TIERS: Tier[] = [
       "Founders badge in app",
     ],
     ctaLabel: "Claim a Founders seat",
-    ctaHref: "/api/billing/checkout?tier=founders_lifetime",
   },
 ];
 
@@ -144,12 +140,7 @@ export function PricingTiers() {
             </p>
 
             <div className="mt-auto">
-              <Link
-                href={t.ctaHref}
-                className={t.featured ? "btn-primary btn-full" : "btn-secondary btn-full"}
-              >
-                {t.ctaLabel}
-              </Link>
+              <CheckoutButton tier={t.id} label={t.ctaLabel} primary={t.featured} />
             </div>
           </article>
         ))}
